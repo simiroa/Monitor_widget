@@ -42,10 +42,12 @@ cmake --build cpp/build_new --config Release --parallel 8
 ### 3. 배포 패키징 과정
 
 1. `sensor_host`를 `publish` 모드로 빌드합니다.
-2. `cpp/build_new`의 출력물과 `sensor_host` 결과물을 `Release/portable`에 모읍니다.
+2. `package_portable.bat`을 실행하여 `cpp/build_new`의 출력물과 `sensor_host` 결과물을 `Release/portable`에 모읍니다.
+   - **패키징 전에 `monitor_widget.exe`와 `sensor_host.exe`를 모두 종료해야 합니다.** 실행 중이면 스크립트가 기존 `Release/portable`을 지우지 않고 즉시 에러로 종료합니다.
 3. `installer/setup.iss`를 Inno Setup으로 빌드하여 `Release/installer`에 설치 파일을 생성합니다.
 
 ```powershell
+.\package_portable.bat
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "C:\Users\HG\Documents\monitor_widget_portable\installer\setup.iss"
 ```
 
