@@ -44,8 +44,6 @@ add_executable(monitor_widget WIN32
     src/ui/style_tokens.h
     src/ui/net_tooltip_helper.h
     src/ui/net_tooltip_helper.cpp
-    src/ui/virtual_monitor_controller.h
-    src/ui/virtual_monitor_controller.cpp
     src/ui/sidebar_item.h
     src/ui/sidebar_item.cpp
     src/ui/drive_row.h
@@ -88,8 +86,6 @@ add_executable(monitor_widget WIN32
     src/services/cleanup_service.cpp
     src/services/monitor_control_service.h
     src/services/monitor_control_service.cpp
-    src/services/virtual_monitor_driver.h
-    src/services/virtual_monitor_driver.cpp
     src/services/process_control_service.h
     src/services/process_control_service.cpp
     src/services/sensor_host_client.h
@@ -133,7 +129,7 @@ target_link_libraries(monitor_widget
 
 if (WIN32)
     target_compile_definitions(monitor_widget PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN WINVER=0x0A00 _WIN32_WINNT=0x0A00)
-    target_link_libraries(monitor_widget PRIVATE pdh iphlpapi psapi PowrProf dxgi ws2_32 shell32 ole32 oleaut32 dxva2 wbemuuid setupapi cfgmgr32 newdev advapi32 tdh)
+    target_link_libraries(monitor_widget PRIVATE pdh iphlpapi psapi PowrProf dxgi ws2_32 shell32 ole32 oleaut32 dxva2 wbemuuid advapi32 tdh)
 endif()
 
 if (WIN32 AND MINGW)

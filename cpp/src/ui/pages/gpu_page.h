@@ -18,9 +18,6 @@ public:
 
     void updateStats(const SystemStats &stats);
 
-signals:
-    void vmAutoToggled(bool enabled);
-
 protected:
     void showEvent(QShowEvent *event) override;
 
@@ -43,10 +40,6 @@ private:
     QPushButton *night_button_ = nullptr;
     QPushButton *hdr_button_ = nullptr;
     QPushButton *sleep_button_ = nullptr;
-    QPushButton *vm_toggle_ = nullptr; // Virtual Monitor Auto Toggle
-    QPushButton *vm_manual_button_ = nullptr; // Manual Toggle
-    QLabel *vm_status_ = nullptr;
-    QPushButton *vm_install_ = nullptr;
     QSlider *brightness_slider_ = nullptr;
     QLabel *brightness_value_ = nullptr;
     QComboBox *refresh_combo_ = nullptr;

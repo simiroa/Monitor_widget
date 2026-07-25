@@ -4,7 +4,6 @@
 #include <QComboBox>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QShowEvent>
 #include <QSlider>
@@ -148,93 +147,6 @@ GpuPage::GpuPage(MonitorControlService *control_service, QWidget *parent)
     refresh_row->addWidget(refresh_apply_);
     layout->addLayout(refresh_row);
 
-    // VM Row 1: Manual Toggle & Auto Toggle
-    auto *vm_row1 = new QHBoxLayout();
-    vm_row1->setSpacing(4);
-    auto *vm_label = new QLabel("VM Control", this);
-    vm_label->setFixedWidth(65);
-    vm_label->setStyleSheet(UiStyle::kDetailSmall);
-
-    // Manual Toggle
-    vm_manual_button_ = new QPushButton("Manual", this);
-    vm_manual_button_->setCheckable(true);
-    vm_manual_button_->setFixedHeight(22);
-    vm_manual_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    vm_manual_button_->setStyleSheet(UiStyle::kButtonToggle);
-    vm_manual_button_->setToolTip("가상 모니터를 수동으로 켜거나 끕니다.\n켜짐 상태에서 끄면 이전 화면 배치를 복구합니다.");
-    connect(vm_manual_button_, &QPushButton::clicked, this, [this](bool checked) {
-        if (control_service_) {
-            // This is blocking, so UI might freeze briefly.
-            control_service_->setVirtualMonitorState(checked);
-            syncControls();
-        }
-    });
-
-    // Auto Toggle
-    vm_toggle_ = new QPushButton("Auto", this);
-    vm_toggle_->setCheckable(true);
-    vm_toggle_->setFixedHeight(22);
-    vm_toggle_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    vm_toggle_->setStyleSheet(UiStyle::kButtonToggle);
-    vm_toggle_->setToolTip("실제 모니터가 모두 꺼졌을 때 가상 모니터를 자동 활성화합니다.\n모니터를 꺼도 원격 접속이 가능합니다.");
-
-    connect(vm_toggle_, &QPushButton::toggled, this, [this](bool checked) {
-        if (control_service_) {
-            control_service_->setVmAutoStartEnabled(checked);
-        }
-        emit vmAutoToggled(checked);
-    });
-
-    vm_status_ = new QLabel("-", this);
-    vm_status_->setStyleSheet(UiStyle::kDetailSmall);
-    vm_status_->setFixedWidth(52); // Align with Brightness value and Refresh Apply
-    vm_status_->setAlignment(Qt::AlignCenter);
-
-    vm_row1->addWidget(vm_label);
-    vm_row1->addWidget(vm_manual_button_, 1);
-    vm_row1->addWidget(vm_toggle_, 1);
-    vm_row1->addWidget(vm_status_);
-    layout->addLayout(vm_row1);
-
-    // VM Row 2: Install link
-    auto *vm_row2 = new QHBoxLayout();
-    vm_row2->setSpacing(4);
-    auto *vm_install_spacer = new QLabel("", this);
-    vm_install_spacer->setFixedWidth(65);
-
-    vm_install_ = new QPushButton("가상 모니터 드라이버 설치", this);
-    vm_install_->setCursor(Qt::PointingHandCursor);
-    vm_install_->setStyleSheet(
-        "QPushButton { background: transparent; border: none; color: #74d97b; text-align: left; padding: 0; }"
-        "QPushButton:hover { color: #9cf0a0; text-decoration: underline; }"
-        "QPushButton:disabled { color: #555555; text-decoration: none; }"
-    );
-    connect(vm_install_, &QPushButton::clicked, this, [this]() {
-        if (!control_service_) {
-            return;
-        }
-        QMessageBox box(this);
-        box.setWindowTitle("가상 모니터 드라이버 설치");
-        box.setText("번들 드라이버를 설치합니다.\n설치 중 화면이 잠시 깜빡일 수 있습니다.");
-        box.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
-        box.setDefaultButton(QMessageBox::Ok);
-        if (box.exec() != QMessageBox::Ok) {
-            return;
-        }
-
-        vm_install_->setEnabled(false);
-        const bool ok = control_service_->installBundledVirtualMonitorDriver();
-        if (!ok) {
-            vm_install_->setEnabled(true);
-            QMessageBox::warning(this, "설치 실패", "드라이버 설치에 실패했습니다. 관리자 권한을 확인하세요.");
-        }
-        syncControls();
-    });
-
-    vm_row2->addWidget(vm_install_spacer);
-    vm_row2->addWidget(vm_install_, 1);
-    layout->addLayout(vm_row2);
-
     control_notice_label_ = new QLabel("", this);
     control_notice_label_->setStyleSheet(UiStyle::kNote);
     control_notice_label_->setWordWrap(true);
@@ -270,44 +182,6 @@ void GpuPage::syncControls() {
         hdr_button_->blockSignals(true);
         hdr_button_->setChecked(control_service_->hdrEnabled());
         hdr_button_->blockSignals(false);
-    }
-
-    if (vm_toggle_) {
-        const bool has_driver = control_service_->hasVirtualMonitorDriver();
-        const bool has_bundle = control_service_->hasBundledVirtualMonitorDriver();
-        const bool is_vm_enabled = control_service_->isVirtualMonitorEnabled();
-
-        vm_toggle_->setEnabled(has_driver);
-        vm_manual_button_->setEnabled(has_driver);
-        vm_install_->setEnabled(!has_driver && has_bundle);
-
-        vm_toggle_->blockSignals(true);
-        vm_toggle_->setChecked(has_driver && control_service_->isVmAutoStartEnabled());
-        vm_toggle_->blockSignals(false);
-
-        vm_manual_button_->blockSignals(true);
-        vm_manual_button_->setChecked(is_vm_enabled);
-        vm_manual_button_->blockSignals(false);
-
-        if (vm_status_) {
-            if (has_driver) {
-                if (is_vm_enabled) {
-                    vm_status_->setText("켜짐");
-                    vm_status_->setStyleSheet(QString("%1 color: %2;").arg(UiStyle::kDetailSmall).arg(UiStyle::kColorGreen));
-                } else {
-                    vm_status_->setText("꺼짐");
-                    vm_status_->setStyleSheet(QString("%1 color: %2;").arg(UiStyle::kDetailSmall).arg(UiStyle::kColorTextDim));
-                }
-            } else if (has_bundle) {
-                vm_status_->setText("미설치");
-                vm_status_->setStyleSheet(QString("%1 color: %2;").arg(UiStyle::kDetailSmall).arg(UiStyle::kColorYellow));
-            } else {
-                vm_status_->setText("없음");
-                vm_status_->setStyleSheet(QString("%1 color: %2;").arg(UiStyle::kDetailSmall).arg(UiStyle::kColorOrange));
-            }
-        }
-        vm_toggle_->setToolTip(has_driver ? "실제 모니터가 모두 꺼졌을 때 가상 모니터를 자동 활성화합니다.\n모니터를 꺼도 원격 접속이 가능합니다."
-                                          : "가상 모니터 드라이버가 없습니다. 설치 후 다시 확인하세요.");
     }
 
     Logger::info("ui.gpu", "Getting brightness...");
@@ -359,12 +233,6 @@ void GpuPage::syncControls() {
         }
         if (!has_rates) {
             notices << "주사율 변경 미지원";
-        }
-
-        const bool has_driver = control_service_->hasVirtualMonitorDriver();
-        const bool has_bundle = control_service_->hasBundledVirtualMonitorDriver();
-        if (!has_driver) {
-            notices << (has_bundle ? "가상 모니터 드라이버 미설치" : "가상 모니터 드라이버 없음");
         }
 
         if (notices.isEmpty()) {

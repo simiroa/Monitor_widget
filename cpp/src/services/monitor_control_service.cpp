@@ -1,5 +1,4 @@
 #include "services/monitor_control_service.h"
-#include "services/virtual_monitor_driver.h"
 
 #include <algorithm>
 #include <mutex>
@@ -10,7 +9,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QProcess>
-#include <QSettings>
 
 #include <oleauto.h>
 #include <wbemidl.h>
@@ -334,11 +332,8 @@ bool setHdrState(bool enable) {
 }  // namespace
 
 MonitorControlService::MonitorControlService() {
-    QSettings settings("MonitorWidget", "Settings");
-    vm_auto_start_enabled_ = settings.value("vm/autoStart", false).toBool();
     initial_brightness_ = brightness();
     initial_refresh_rate_ = currentRefreshRate();
-    initial_vm_state_ = isVirtualMonitorEnabled();
 }
 
 MonitorControlService::~MonitorControlService() {
@@ -596,52 +591,6 @@ void MonitorControlService::turnOffMonitors() const {
     Logger::info("service.monitor", "Monitor power off requested.");
 }
 
-bool MonitorControlService::saveCurrentLayout() {
-    UINT32 numPathArrayElements = 0;
-    UINT32 numModeInfoArrayElements = 0;
-    
-    // QDC_DATABASE_CURRENT represents the "active" or "last known good" layout in registry/database
-    // QDC_ONLY_ACTIVE_PATHS gets what is strictly active now.
-    // Using QDC_ONLY_ACTIVE_PATHS is safer to capture "what works right now".
-    if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &numPathArrayElements, &numModeInfoArrayElements) != ERROR_SUCCESS) {
-        return false;
-    }
-
-    QVector<DISPLAYCONFIG_PATH_INFO> paths(numPathArrayElements);
-    QVector<DISPLAYCONFIG_MODE_INFO> modes(numModeInfoArrayElements);
-
-    if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &numPathArrayElements, paths.data(), &numModeInfoArrayElements, modes.data(), nullptr) != ERROR_SUCCESS) {
-        Logger::warn("service.monitor", "QueryDisplayConfig failed for saving layout.");
-        return false;
-    }
-
-    saved_paths_ = paths;
-    saved_modes_ = modes;
-    layout_saved_ = true;
-    Logger::info("service.monitor", QString("Display layout saved. Paths=%1 Modes=%2").arg(saved_paths_.size()).arg(saved_modes_.size()));
-    return true;
-}
-
-bool MonitorControlService::restoreSavedLayout() {
-    if (!layout_saved_ || saved_paths_.isEmpty()) {
-        Logger::warn("service.monitor", "No saved layout to restore.");
-        return false;
-    }
-
-    // SetDisplayConfig with SDC_APPLY to force the saved configuration
-    LONG ret = SetDisplayConfig(static_cast<UINT32>(saved_paths_.size()), saved_paths_.data(),
-                                static_cast<UINT32>(saved_modes_.size()), saved_modes_.data(),
-                                SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE); // Added SDC_SAVE_TO_DATABASE to persist it
-
-    if (ret != ERROR_SUCCESS) {
-        Logger::warn("service.monitor", QString("SetDisplayConfig failed err=%1").arg(ret));
-        return false;
-    }
-    
-    Logger::info("service.monitor", "Display layout restored successfully.");
-    return true;
-}
-
 void MonitorControlService::restore() {
     // 1. Always restore Night Mode as it's a software gamma change (no flicker)
     if (night_mode_active_) {
@@ -650,7 +599,7 @@ void MonitorControlService::restore() {
 
     // 2. Restore individual hardware settings ONLY if they differ from initial state.
     // This minimizes screen flickers on app exit for users who didn't touch these.
-    
+
     // Brightness
     if (initial_brightness_ >= 0) {
         int current = brightness();
@@ -668,103 +617,4 @@ void MonitorControlService::restore() {
             Logger::info("service.monitor", QString("Restored refresh rate to %1").arg(initial_refresh_rate_));
         }
     }
-
-    // 3. Virtual Monitor State (includes layout restoration if disabling)
-    if (isVirtualMonitorEnabled() != initial_vm_state_) {
-        setVirtualMonitorState(initial_vm_state_);
-        Logger::info("service.monitor", QString("Restored virtual monitor state to %1").arg(initial_vm_state_));
-    }
-}
-
-// (Moved to VirtualMonitorDriver)
-
-int MonitorControlService::activePhysicalMonitorCount() const {
-#ifdef _WIN32
-    int count = 0;
-    DISPLAY_DEVICEW adapter{};
-    adapter.cb = sizeof(adapter);
-
-    for (DWORD i = 0; EnumDisplayDevicesW(nullptr, i, &adapter, 0); ++i) {
-        if (!(adapter.StateFlags & DISPLAY_DEVICE_ACTIVE)) {
-            adapter.cb = sizeof(adapter);
-            continue;
-        }
-        if (adapter.StateFlags & DISPLAY_DEVICE_MIRRORING_DRIVER) {
-            adapter.cb = sizeof(adapter);
-            continue;
-        }
-
-        DISPLAY_DEVICEW monitor{};
-        monitor.cb = sizeof(monitor);
-        for (DWORD j = 0; EnumDisplayDevicesW(adapter.DeviceName, j, &monitor, 0); ++j) {
-            if (!(monitor.StateFlags & DISPLAY_DEVICE_ACTIVE)) {
-                monitor.cb = sizeof(monitor);
-                continue;
-            }
-            
-            // Check if this is the virtual monitor
-            const QString device_id = QString::fromWCharArray(monitor.DeviceID);
-            if (device_id.contains(L"MttVDD", Qt::CaseInsensitive)) {
-                monitor.cb = sizeof(monitor);
-                continue;
-            }
-            
-            count++;
-            monitor.cb = sizeof(monitor);
-        }
-
-        adapter.cb = sizeof(adapter);
-    }
-    return count;
-#else
-    return 0;
-#endif
-}
-
-
-bool MonitorControlService::setVirtualMonitorState(bool enable) {
-    if (enable) {
-        if (isVirtualMonitorEnabled()) return true;
-
-        // Save layout before enabling if physical monitors are active
-        if (activePhysicalMonitorCount() > 0) {
-            saveCurrentLayout();
-        }
-        return VirtualMonitorDriver::setDriverEnabled(true);
-    } else {
-        if (!isVirtualMonitorEnabled()) return true;
-
-        if (VirtualMonitorDriver::setDriverEnabled(false)) {
-            restoreSavedLayout();
-            return true;
-        }
-        return false;
-    }
-}
-
-bool MonitorControlService::isVirtualMonitorEnabled() const {
-    return VirtualMonitorDriver::isDriverEnabled();
-}
-
-bool MonitorControlService::hasVirtualMonitorDriver() const {
-    return VirtualMonitorDriver::isDriverInstalled();
-}
-
-bool MonitorControlService::hasBundledVirtualMonitorDriver() const {
-    return VirtualMonitorDriver::hasBundledDriver();
-}
-
-bool MonitorControlService::installBundledVirtualMonitorDriver() const {
-    return VirtualMonitorDriver::installBundledDriver();
-}
-
-void MonitorControlService::setVmAutoStartEnabled(bool enabled) {
-    vm_auto_start_enabled_ = enabled;
-    QSettings settings("MonitorWidget", "Settings");
-    settings.setValue("vm/autoStart", enabled);
-    Logger::info("service.monitor", QString("VM Auto Start set to %1").arg(enabled));
-}
-
-bool MonitorControlService::isVmAutoStartEnabled() const {
-    return vm_auto_start_enabled_;
 }

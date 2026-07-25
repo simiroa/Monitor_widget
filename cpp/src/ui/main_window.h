@@ -23,7 +23,6 @@ class QCheckBox;
 class QSlider;
 class QSystemTrayIcon;
 class QAction;
-class VirtualMonitorController;
 
 struct ProcessInfo;
 class StatsEngine;
@@ -47,7 +46,6 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
-    bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;
 
 private slots:
     void toggleExpand(int index);
@@ -107,7 +105,6 @@ private:
     bool first_show_ = true;
     QTimer *clock_timer_ = nullptr;
     QTimer *compact_timer_ = nullptr;
-    VirtualMonitorController *vm_controller_ = nullptr;
     class WeatherService *weather_service_ = nullptr;
     SystemStats last_stats_;
 };

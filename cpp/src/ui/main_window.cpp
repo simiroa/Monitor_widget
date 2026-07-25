@@ -41,7 +41,6 @@
 #include "ui/sidebar_item.h"
 #include "ui/style_tokens.h"
 #include "ui/icons_material.h" // Added this include
-#include "ui/virtual_monitor_controller.h"
 #include "utils/logger.h"
 namespace {
 constexpr int kSidebarWidth = 120;
@@ -58,8 +57,6 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground); // Enable transparency for rounded corners
     setFixedSize(kSidebarWidth, kWindowHeight);
-
-    vm_controller_ = new VirtualMonitorController(&monitor_controls_, this);
 
     buildUi();
 
@@ -119,11 +116,6 @@ MainWindow::MainWindow(QWidget *parent)
     connect(clock_timer_, &QTimer::timeout, this, &MainWindow::updateDashboardTime);
     clock_timer_->start(1000);
     updateDashboardTime(); // Initial update
-
-    if (vm_controller_) {
-        vm_controller_->setAutoEnabled(monitor_controls_.isVmAutoStartEnabled());
-        vm_controller_->handleDisplayChange();
-    }
 }
 
 MainWindow::~MainWindow() {
@@ -133,10 +125,6 @@ MainWindow::~MainWindow() {
     if (engine_thread_) {
         engine_thread_->quit();
         engine_thread_->wait(2000);
-    }
-    if (vm_controller_) {
-        delete vm_controller_;
-        vm_controller_ = nullptr;
     }
 }
 
@@ -276,16 +264,6 @@ void MainWindow::buildUi() {
     stack_->addWidget(disk_page_);
     stack_->addWidget(net_page_);
     stack_->addWidget(server_page_);
-
-    if (gpu_page_ && vm_controller_) {
-        connect(gpu_page_, &GpuPage::vmAutoToggled, this, [this](bool enabled) {
-            if (!vm_controller_) {
-                return;
-            }
-            vm_controller_->setAutoEnabled(enabled);
-            vm_controller_->handleDisplayChange();
-        });
-    }
 
     auto *content_layout = new QVBoxLayout(content_);
     content_layout->setContentsMargins(0, 0, 0, 0);
@@ -431,7 +409,6 @@ void MainWindow::toggleExpand(int index) {
             QMetaObject::invokeMethod(engine_, "setNetProcessUpdatesEnabled",
                                       Qt::QueuedConnection, Q_ARG(bool, false));
         }
-        // Keep Auto VM enabled even when collapsed.
         Logger::info("ui.main", "Collapsed sidebar.");
         return;
     }
@@ -474,9 +451,6 @@ void MainWindow::toggleExpand(int index) {
         QMetaObject::invokeMethod(engine_, "setNetProcessUpdatesEnabled",
                                   Qt::QueuedConnection,
                                   Q_ARG(bool, expanded_ && current_page_ == 6));
-    }
-    if (vm_controller_) {
-        vm_controller_->setAutoEnabled(monitor_controls_.isVmAutoStartEnabled());
     }
     Logger::info("ui.main", QString("Expanded page index=%1.").arg(index));
 }
@@ -644,23 +618,6 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 
     move(new_pos);
     event->accept();
-}
-
-
-
-bool MainWindow::nativeEvent(const QByteArray &eventType, void *message, qintptr *result) {
-    if (eventType == "windows_generic_MSG") {
-        MSG *msg = static_cast<MSG *>(message);
-        if (msg->message == WM_DISPLAYCHANGE) {
-             Logger::info("ui.main", "WM_DISPLAYCHANGE detected.");
-             
-             if (vm_controller_) {
-                 vm_controller_->setAutoEnabled(monitor_controls_.isVmAutoStartEnabled());
-                 vm_controller_->handleDisplayChange();
-             }
-        }
-    }
-    return QMainWindow::nativeEvent(eventType, message, result);
 }
 
 void MainWindow::updateDashboardTime() {
