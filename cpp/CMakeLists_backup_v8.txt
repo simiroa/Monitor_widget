@@ -1,0 +1,105 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(MonitorWidgetCpp LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
+
+add_executable(monitor_widget WIN32
+    src/app/main.cpp
+    src/collectors/cpu_mem_collector.h
+    src/collectors/cpu_mem_collector.cpp
+    src/collectors/d3dkmt_process_collector.h
+    src/collectors/d3dkmt_process_collector.cpp
+    src/collectors/disk_collector.h
+    src/collectors/disk_collector.cpp
+    src/collectors/drive_collector.h
+    src/collectors/drive_collector.cpp
+    src/collectors/dxcore_process_collector.h
+    src/collectors/dxcore_process_collector.cpp
+    src/collectors/gpu_adapter_memory_collector.h
+    src/collectors/gpu_adapter_memory_collector.cpp
+    src/collectors/gpu_collector.h
+    src/collectors/gpu_collector.cpp
+    src/collectors/gpu_process_collector.h
+    src/collectors/gpu_process_collector.cpp
+    src/collectors/net_collector.h
+    src/collectors/net_collector.cpp
+    src/collectors/process_collector.h
+    src/collectors/process_collector.cpp
+    src/collectors/server_detector.h
+    src/collectors/server_detector.cpp
+    src/ui/main_window.h
+    src/ui/main_window.cpp
+    src/ui/layout_utils.h
+    src/ui/style_tokens.h
+    src/ui/sidebar_item.h
+    src/ui/sidebar_item.cpp
+    src/ui/drive_row.h
+    src/ui/drive_row.cpp
+    src/ui/process_row.h
+    src/ui/process_row.cpp
+    src/ui/cleanup_dialog.h
+    src/ui/cleanup_dialog.cpp
+    src/ui/pages/process_list_page.h
+    src/ui/pages/process_list_page.cpp
+    src/ui/pages/gpu_page.h
+    src/ui/pages/gpu_page.cpp
+    src/ui/pages/disk_page.h
+    src/ui/pages/disk_page.cpp
+    src/ui/pages/net_page.h
+    src/ui/pages/net_page.cpp
+    src/ui/pages/server_page.h
+    src/ui/pages/server_page.cpp
+    src/engine/stats_engine.h
+    src/engine/stats_engine.cpp
+    src/services/cleanup_service.h
+    src/services/cleanup_service.cpp
+    src/services/monitor_control_service.h
+    src/services/monitor_control_service.cpp
+    src/services/process_control_service.h
+    src/services/process_control_service.cpp
+    src/services/sensor_host_client.h
+    src/services/sensor_host_client.cpp
+    src/services/speed_test_service.h
+    src/services/speed_test_service.cpp
+    src/utils/win_utils.h
+    src/utils/win_utils.cpp
+    src/utils/logger.h
+    src/utils/logger.cpp
+    src/gpu/gpu_backend.h
+    src/gpu/dxgi_backend.h
+    src/gpu/dxgi_backend.cpp
+    src/gpu/dxcore_min.h
+    src/gpu/dxcore_backend.h
+    src/gpu/dxcore_backend.cpp
+    src/gpu/d3dkmt_backend.h
+    src/gpu/d3dkmt_backend.cpp
+    src/gpu/nvml_backend.h
+    src/gpu/nvml_backend.cpp
+    src/models/system_stats.h
+    src/models/capability_flags.h
+    src/models/process_info.h
+    src/models/speed_test_result.h
+    src/resources/resources.qrc
+)
+
+target_include_directories(monitor_widget PRIVATE src)
+
+target_link_libraries(monitor_widget
+    PRIVATE
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Widgets
+        Qt6::Network
+)
+
+if (WIN32)
+    target_compile_definitions(monitor_widget PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN WINVER=0x0A00 _WIN32_WINNT=0x0A00)
+    target_link_libraries(monitor_widget PRIVATE pdh iphlpapi psapi dxgi ws2_32 shell32 ole32 oleaut32 dxva2 wbemuuid)
+endif()

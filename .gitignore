@@ -1,0 +1,35 @@
+# Build artifacts
+build/
+build_new/
+dist/
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Qt
+.qt/
+CMakeCache.txt
+CMakeFiles/
+*_autogen/
+Makefile
+*.cmake
+
+# Logs and temp
+*.log
+*.tmp
+*.txt
+!CMakeLists.txt
+!README.md
+
+# Installer output  
+installer/Output/
+
+# Large release files (upload to GitHub Releases instead)
+*.zip
+*.exe
+Release/

@@ -1,0 +1,61 @@
+#pragma once
+
+#ifdef _WIN32
+#include <windows.h>
+
+#include <cstdint>
+
+#pragma pack(push, 8)
+
+enum D3DKMT_QUERYSTATISTICS_TYPE : uint32_t {
+    D3DKMT_QUERYSTATISTICS_ADAPTER = 0,
+    D3DKMT_QUERYSTATISTICS_PROCESS = 1,
+    D3DKMT_QUERYSTATISTICS_PROCESS_SEGMENT_GROUP = 9,
+    D3DKMT_QUERYSTATISTICS_NODE = 5,
+};
+
+enum D3DKMT_MEMORY_SEGMENT_GROUP : uint32_t {
+    D3DKMT_MEMORY_SEGMENT_GROUP_LOCAL = 0,
+    D3DKMT_MEMORY_SEGMENT_GROUP_NON_LOCAL = 1
+};
+
+constexpr uint32_t D3DKMT_QUERYSTATISTICS_ALLOCATION_PRIORITY_CLASS_MAX = 5;
+
+struct D3DKMT_QUERYSTATISTICS_PROCESS_NODE_INFORMATION {
+    LARGE_INTEGER RunningTime;
+};
+
+struct D3DKMT_QUERYSTATISTICS_NODE_INFORMATION {
+    D3DKMT_QUERYSTATISTICS_PROCESS_NODE_INFORMATION GlobalInformation;
+    D3DKMT_QUERYSTATISTICS_PROCESS_NODE_INFORMATION SystemInformation;
+};
+
+struct D3DKMT_QUERYSTATISTICS_PROCESS_SEGMENT_GROUP_INFORMATION {
+    UINT64 Budget;
+    UINT64 Requested;
+    UINT64 Usage;
+    UINT64 Demoted[D3DKMT_QUERYSTATISTICS_ALLOCATION_PRIORITY_CLASS_MAX];
+};
+
+constexpr size_t D3DKMT_QUERYSTATISTICS_QUERY_RESULT_SIZE = 0x308;
+
+struct D3DKMT_QUERYSTATISTICS {
+    uint32_t Type;
+    LUID AdapterLuid;
+    HANDLE hProcess;
+    unsigned char QueryResult[D3DKMT_QUERYSTATISTICS_QUERY_RESULT_SIZE];
+    union {
+        uint32_t QueryNodeId;
+        uint32_t QueryProcessSegmentGroup;
+        uint32_t QueryProcessSegmentId;
+        uint32_t QueryProcessNodeId;
+    };
+    uint32_t Pad1;
+};
+
+static_assert(sizeof(D3DKMT_QUERYSTATISTICS) == 0x328, "D3DKMT_QUERYSTATISTICS size mismatch");
+
+using PFND3DKMT_QUERYSTATISTICS = LONG (WINAPI *)(const D3DKMT_QUERYSTATISTICS *);
+
+#pragma pack(pop)
+#endif
