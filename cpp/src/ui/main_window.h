@@ -21,8 +21,6 @@ class QPushButton;
 class SidebarItem;
 class QCheckBox;
 class QSlider;
-class QSystemTrayIcon;
-class QAction;
 
 struct ProcessInfo;
 class StatsEngine;
@@ -60,7 +58,6 @@ private:
     void ensureWindowBounds();
     void setAlwaysOnTop(bool enable);
     void updateOpacity(int value);
-    void toggleVisibilityFromTray();
     void updateDashboardTime();
     void setCompactMode(bool enable);
     void toggleCompactMode();
@@ -79,9 +76,6 @@ private:
     QPushButton *collapse_button_ = nullptr;
     QPushButton *top_button_ = nullptr; // Changed from QCheckBox
     QSlider *opacity_slider_ = nullptr;
-    QSystemTrayIcon *tray_icon_ = nullptr;
-    QAction *tray_toggle_action_ = nullptr;
-    QAction *tray_exit_action_ = nullptr;
     QVector<SidebarItem *> sidebar_items_;
 
     DashboardPage *dashboard_page_ = nullptr;

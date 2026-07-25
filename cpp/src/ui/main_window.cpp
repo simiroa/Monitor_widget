@@ -11,7 +11,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMenu>
 #include <QMetaObject>
 #include <QMouseEvent>
 #include <QProcess>
@@ -22,8 +21,6 @@
 #include <QShowEvent>
 #include <QSlider>
 #include <QStackedWidget>
-#include <QStyle>
-#include <QSystemTrayIcon>
 #include <QThread>
 #include <QTimer>
 #include <QTime>
@@ -207,7 +204,11 @@ void MainWindow::buildUi() {
         .arg("#8b8b94").arg(Icons::fontName()) +
         "QPushButton:hover { color: #ed4245; }"
     );
-    connect(close_button_, &QPushButton::clicked, this, &MainWindow::close);
+    // Directly quits the application (rather than MainWindow::close()) so that the
+    // process exits unconditionally, independent of Qt::Tool/quitOnLastWindowClosed
+    // semantics. This is the sole exit path now that the tray icon (and its "Exit"
+    // action) is gone, and the app runs elevated so an external host cannot kill it.
+    connect(close_button_, &QPushButton::clicked, qApp, &QCoreApplication::quit);
 
     // Collapse Button (-)
     collapse_button_ = new QPushButton("-", top_row);
@@ -288,26 +289,6 @@ void MainWindow::buildUi() {
     updateOpacity(opacity_slider_->value());
 
     // positionCloseButton(); removed - close button is now in sidebar
-
-    if (QSystemTrayIcon::isSystemTrayAvailable()) {
-        tray_icon_ = new QSystemTrayIcon(style()->standardIcon(QStyle::SP_ComputerIcon), this);
-        tray_icon_->setToolTip("Monitor Widget");
-        auto *menu = new QMenu(this);
-        tray_toggle_action_ = menu->addAction("Show/Hide");
-        tray_exit_action_ = menu->addAction("Exit");
-        tray_icon_->setContextMenu(menu);
-
-        connect(tray_toggle_action_, &QAction::triggered, this, &MainWindow::toggleVisibilityFromTray);
-        connect(tray_exit_action_, &QAction::triggered, qApp, &QCoreApplication::quit);
-        connect(tray_icon_, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
-            if (reason == QSystemTrayIcon::Trigger) {
-                toggleVisibilityFromTray();
-            }
-        });
-        tray_icon_->show();
-    } else {
-        Logger::warn("ui.main", "System tray not available.");
-    }
 
     Logger::info("ui.main", "UI built.");
 
@@ -516,17 +497,6 @@ void MainWindow::setAlwaysOnTop(bool enable) {
 void MainWindow::updateOpacity(int value) {
     const double opacity = static_cast<double>(value) / 100.0;
     setWindowOpacity(opacity);
-}
-
-void MainWindow::toggleVisibilityFromTray() {
-    if (isVisible()) {
-        hide();
-    } else {
-        show();
-        ensureWindowBounds();
-        raise();
-        activateWindow();
-    }
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
