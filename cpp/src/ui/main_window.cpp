@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMetaObject>
 #include <QMouseEvent>
 #include <QProcess>
 #include <QPushButton>
@@ -57,6 +58,8 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::Tool);
     setAttribute(Qt::WA_TranslucentBackground); // Enable transparency for rounded corners
     setFixedSize(kSidebarWidth, kWindowHeight);
+
+    vm_controller_ = new VirtualMonitorController(&monitor_controls_, this);
 
     buildUi();
 
@@ -117,7 +120,6 @@ MainWindow::MainWindow(QWidget *parent)
     clock_timer_->start(1000);
     updateDashboardTime(); // Initial update
 
-    vm_controller_ = new VirtualMonitorController(&monitor_controls_, this);
     if (vm_controller_) {
         vm_controller_->setAutoEnabled(monitor_controls_.isVmAutoStartEnabled());
         vm_controller_->handleDisplayChange();
@@ -426,7 +428,8 @@ void MainWindow::toggleExpand(int index) {
             btn->setChecked(false);
         }
         if (engine_) {
-            engine_->setNetProcessUpdatesEnabled(false);
+            QMetaObject::invokeMethod(engine_, "setNetProcessUpdatesEnabled",
+                                      Qt::QueuedConnection, Q_ARG(bool, false));
         }
         // Keep Auto VM enabled even when collapsed.
         Logger::info("ui.main", "Collapsed sidebar.");
@@ -445,12 +448,32 @@ void MainWindow::toggleExpand(int index) {
 
     current_page_ = index;
     stack_->setCurrentIndex(index);
+    {
+        QWidget *current = stack_->currentWidget();
+        if (current == cpu_page_) {
+            cpu_page_->updateStats(last_stats_);
+        } else if (current == ram_page_) {
+            ram_page_->updateStats(last_stats_);
+        } else if (current == gpu_page_) {
+            gpu_page_->updateStats(last_stats_);
+        } else if (current == vram_page_) {
+            vram_page_->updateStats(last_stats_);
+        } else if (current == disk_page_) {
+            disk_page_->updateStats(last_stats_);
+        } else if (current == net_page_) {
+            net_page_->updateStats(last_stats_);
+        } else if (current == server_page_) {
+            server_page_->updateStats(last_stats_);
+        }
+    }
     for (int i = 0; i < sidebar_items_.size(); ++i) {
         sidebar_items_[i]->setChecked(i == index);
     }
     positionOpacitySlider();
     if (engine_) {
-        engine_->setNetProcessUpdatesEnabled(expanded_ && current_page_ == 6);
+        QMetaObject::invokeMethod(engine_, "setNetProcessUpdatesEnabled",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(bool, expanded_ && current_page_ == 6));
     }
     if (vm_controller_) {
         vm_controller_->setAutoEnabled(monitor_controls_.isVmAutoStartEnabled());
@@ -689,27 +712,27 @@ void MainWindow::updateSidebar(const SystemStats &stats) {
 }
 
 void MainWindow::handleStatsUpdated(const SystemStats &stats) {
+    last_stats_ = stats;
     updateSidebar(stats);
 
-    if (cpu_page_) {
+    if (!content_ || !content_->isVisible()) {
+        return;
+    }
+
+    QWidget *current = stack_ ? stack_->currentWidget() : nullptr;
+    if (current == cpu_page_) {
         cpu_page_->updateStats(stats);
-    }
-    if (ram_page_) {
+    } else if (current == ram_page_) {
         ram_page_->updateStats(stats);
-    }
-    if (gpu_page_) {
+    } else if (current == gpu_page_) {
         gpu_page_->updateStats(stats);
-    }
-    if (vram_page_) {
+    } else if (current == vram_page_) {
         vram_page_->updateStats(stats);
-    }
-    if (disk_page_) {
+    } else if (current == disk_page_) {
         disk_page_->updateStats(stats);
-    }
-    if (net_page_) {
+    } else if (current == net_page_) {
         net_page_->updateStats(stats);
-    }
-    if (server_page_) {
+    } else if (current == server_page_) {
         server_page_->updateStats(stats);
     }
 }

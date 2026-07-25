@@ -4,6 +4,7 @@
 #include <QPoint>
 #include <QVector>
 
+#include "models/system_stats.h"
 #include "services/monitor_control_service.h"
 #include "services/process_control_service.h"
 
@@ -24,7 +25,6 @@ class QSystemTrayIcon;
 class QAction;
 class VirtualMonitorController;
 
-struct SystemStats;
 struct ProcessInfo;
 class StatsEngine;
 class ProcessListPage;
@@ -109,4 +109,5 @@ private:
     QTimer *compact_timer_ = nullptr;
     VirtualMonitorController *vm_controller_ = nullptr;
     class WeatherService *weather_service_ = nullptr;
+    SystemStats last_stats_;
 };
