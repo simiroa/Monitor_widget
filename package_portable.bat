@@ -53,13 +53,18 @@ if errorlevel 8 (
     exit /b 1
 )
 
-REM --- GL/D3D DLLs: unverified as removable, left in place ---
-REM QWidget 전용 앱이라 불필요할 가능성이 높으나 미검증. 활성화 전 실제 실행
-REM 확인 필요. 합계 약 39.5MB 절감.
-REM     del "%DEST%\opengl32sw.dll"
-REM     del "%DEST%\dxcompiler.dll"
-REM     del "%DEST%\D3Dcompiler_47.dll"
-REM     del "%DEST%\dxil.dll"
+echo Removing unused GL/D3D DLLs ...
+REM --- GL/D3D DLLs: 검증 완료, 삭제 ---
+REM windeployqt가 Qt Quick/RHI 백엔드용으로 무조건 복사하는 DLL들이다.
+REM 이 앱은 QWidget 전용이라 해당 경로를 타지 않는다:
+REM   - cpp/src 전체에 QOpenGL*/QtQuick/QQuick*/QSurfaceFormat 사용 0건
+REM   - cpp/CMakeLists.txt 링크 Qt 모듈은 Core/Gui/Widgets/Network 4개뿐
+REM     (Qt6::Quick, Qt6::OpenGL, Qt6::Qml 링크 없음)
+REM 합계 약 38.8MB 절감. 삭제 후 실제 기동 확인 완료.
+REM 향후 QtQuick/QOpenGLWidget을 도입하면 이 블록을 되돌릴 것.
+for %%D in (opengl32sw.dll dxcompiler.dll D3Dcompiler_47.dll dxil.dll) do (
+    if exist "%DEST%\%%D" del /q "%DEST%\%%D"
+)
 
 echo Copying sensor_host publish output ...
 mkdir "%DEST%\sensor_host"
