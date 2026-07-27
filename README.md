@@ -31,11 +31,10 @@
 - **I/O**: 디스크 및 네트워크 실시간 트래픽 모니터링
 - **Process List**: 리소스 점유율 높은 프로세스 확인 및 관리(종료/일시정지)
 
-### 2. 가상 모니터 및 디스플레이 제어 (Display Control)
+### 2. 디스플레이 제어 (Display Control)
 
-- **가상 모니터(Virtual Monitor)**: 실제 모니터가 꺼진 상태에서도 원격 접속이 가능하도록 가상 모니터 드라이버 통합 지원
-- **스마트 제어**: 야간 모드(Night Mode), HDR 토글, 모니터 절전 및 디스플레이 설정 바로가기
-- **정밀 복구**: 앱 종료 시 이전의 밝기, 주사율, 디스플레이 배치를 감지하여 원상 복구
+- **스마트 제어**: 밝기 조절, 주사율 조절, 야간 모드(Night Mode), HDR 토글, 모니터 절전 및 디스플레이 설정 바로가기
+- **정밀 복구**: 앱 종료 시 이전의 밝기와 주사율을 감지하여 원상 복구
 
 ### 3. 스마트 날씨 서비스 (Weather)
 
@@ -49,7 +48,7 @@
 
 - **Frontend**: C++ 17, Qt 6.10 (Modular Architecture)
 - **Backend Host**: .NET 8 (Hardware Sensor Core)
-- **Utilities**: Win32 API 캡슐화 (WinUtils), Virtual Display Driver (MttVDD)
+- **Utilities**: Win32 API 캡슐화 (WinUtils)
 - **Build Tool**: MinGW-w64, CMake, windeployqt
 
 ---
