@@ -3,7 +3,11 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+        <!-- asInvoker + main.cpp의 ensureElevated() 자기 승격 조합.
+             requireAdministrator면 Windows가 CreateProcess 단계에서 막아버려
+             (Win32 error 740) ContextHub의 ProcessRunner(UseShellExecute=false +
+             stdout 리다이렉트)가 이 앱을 아예 띄울 수 없다. -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
       </requestedPrivileges>
     </security>
   </trustInfo>

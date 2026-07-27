@@ -88,8 +88,12 @@ add_executable(monitor_widget WIN32
     src/services/monitor_control_service.cpp
     src/services/process_control_service.h
     src/services/process_control_service.cpp
+    src/services/instance_ipc.h
+    src/services/instance_ipc.cpp
     src/services/sensor_host_client.h
     src/services/sensor_host_client.cpp
+    src/services/status_writer.h
+    src/services/status_writer.cpp
     src/services/speed_test_service.h
     src/services/speed_test_service.cpp
     src/utils/win_utils.h
@@ -118,6 +122,13 @@ add_executable(monitor_widget WIN32
 )
 
 target_include_directories(monitor_widget PRIVATE src)
+
+# win_admin.rc가 RT_MANIFEST로 app.manifest를 임베드하는데, CMake는 .rc가
+# 참조하는 파일을 의존성으로 추적하지 않는다. 이게 없으면 app.manifest를
+# 수정해도 리소스가 재컴파일되지 않아 옛 매니페스트가 exe에 그대로 남는다
+# (asInvoker로 바꿔도 requireAdministrator가 유지되어 ContextHub에서 740 실패).
+set_property(SOURCE src/resources/win_admin.rc APPEND PROPERTY
+    OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/resources/app.manifest")
 
 target_link_libraries(monitor_widget
     PRIVATE

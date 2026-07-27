@@ -16,6 +16,7 @@
 #include "models/process_info.h"
 #include "models/speed_test_result.h"
 #include "models/system_stats.h"
+#include "services/instance_ipc.h"
 #include "ui/main_window.h"
 #include "utils/logger.h"
 #include "utils/win_utils.h"
@@ -115,10 +116,20 @@ void loadFonts() {
 
 int main(int argc, char *argv[]) {
 #ifdef _WIN32
+    // 호출 순서가 중요하다: ensureElevated() → IPC 체크 → QApplication 생성.
+    // 비권한 트램폴린이 서버를 먼저 잡으면 승격본이 2번째 인스턴스로 오인되어 죽는다.
     if (!ensureElevated()) {
         return 0;
     }
 #endif
+
+    // ContextHub 트레이/퀵런처가 넘기는 인수. 판단은 전부 argv로 한다.
+    const HubArgs hub_args = InstanceIpc::parseArgs(argc, argv);
+
+    // 이미 실행 중이면 명령만 넘기고 즉시 종료 — 두 번째 창이 뜨지 않도록.
+    if (InstanceIpc::sendToRunningInstance(hub_args.command)) {
+        return 0;
+    }
 
     QCoreApplication::setOrganizationName("HG");
     QCoreApplication::setApplicationName("MonitorWidgetCpp");
@@ -138,6 +149,11 @@ int main(int argc, char *argv[]) {
     });
 
     MainWindow window;
+
+    auto *ipc = new InstanceIpc(&app);
+    QObject::connect(ipc, &InstanceIpc::commandReceived, &window, &MainWindow::handleHubCommand);
+    ipc->listen();
+
     window.show();
 
     return app.exec();

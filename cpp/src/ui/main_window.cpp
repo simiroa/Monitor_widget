@@ -46,6 +46,7 @@ constexpr int kWindowHeight = 320; // Increased from 285 to prevent sidebar over
 constexpr int kCompactHeight = 75; 
 }
 
+#include "services/status_writer.h"
 #include "services/weather_service.h"
 
 MainWindow::MainWindow(QWidget *parent)
@@ -106,6 +107,11 @@ MainWindow::MainWindow(QWidget *parent)
     connect(engine_, &StatsEngine::processesUpdated, this, &MainWindow::handleProcessesUpdated);
     connect(engine_, &StatsEngine::netProcessesUpdated, this, &MainWindow::handleNetProcessesUpdated);
     
+    // ContextHub용 status.json 발행. 엔진이 다른 스레드에 있으므로 queued로 전달된다.
+    status_writer_ = new StatusWriter(this);
+    connect(engine_, &StatsEngine::statsUpdated, status_writer_, &StatusWriter::updateStats);
+    status_writer_->start();
+
     engine_thread_->start();
 
     // 1-second timer for Dashboard clock
@@ -123,6 +129,35 @@ MainWindow::~MainWindow() {
         engine_thread_->quit();
         engine_thread_->wait(2000);
     }
+}
+
+void MainWindow::handleHubCommand(const QString &command) {
+    if (command == "toggle") {
+        if (isVisible()) {
+            hide();
+        } else {
+            showAndRaise();
+        }
+        return;
+    }
+    if (command == "show") {
+        showAndRaise();
+        return;
+    }
+    if (command == "quit") {
+        // 닫기 버튼과 동일 경로. MonitorControlService::restore()가 여기서 돌아야
+        // 밝기·주사율이 원복된다.
+        qApp->quit();
+        return;
+    }
+    // 빈 문자열/알 수 없는 명령은 무시한다.
+    Logger::info("ipc", QString("Ignored command=%1").arg(command));
+}
+
+void MainWindow::showAndRaise() {
+    show();
+    raise();
+    activateWindow();
 }
 
 void MainWindow::showEvent(QShowEvent *event) {

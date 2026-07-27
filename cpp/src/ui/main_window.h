@@ -38,6 +38,12 @@ public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow() override;
 
+public slots:
+    // ContextHub IPC 명령 처리(toggle/show/quit, 그 외는 무시).
+    // quit은 닫기 버튼과 동일하게 qApp->quit()을 타야
+    // MonitorControlService::restore()가 실행되어 밝기·주사율이 원복된다.
+    void handleHubCommand(const QString &command);
+
 protected:
     void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -53,6 +59,7 @@ private slots:
 
 private:
     void buildUi();
+    void showAndRaise();
     void updateSidebar(const SystemStats &stats);
     void positionOpacitySlider();
     void ensureWindowBounds();
@@ -99,6 +106,7 @@ private:
     bool first_show_ = true;
     QTimer *clock_timer_ = nullptr;
     QTimer *compact_timer_ = nullptr;
+    class StatusWriter *status_writer_ = nullptr;
     class WeatherService *weather_service_ = nullptr;
     SystemStats last_stats_;
 };
