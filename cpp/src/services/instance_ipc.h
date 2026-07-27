@@ -3,6 +3,7 @@
 #include <QLocalServer>
 #include <QObject>
 #include <QString>
+#include <QTimer>
 
 // ContextHub가 넘기는 인수. 두 경로에서 argv 모양이 다르다.
 //   트레이 메뉴  : --hub --action toggle
@@ -26,18 +27,30 @@ public:
     // 다중 사용자 환경 충돌 방지를 위해 세션 ID를 이름에 넣는다.
     static QString serverName();
 
-    // 이미 실행 중인 인스턴스에 command를 전달했으면 true.
-    // true면 호출자는 즉시 종료해야 한다(두 번째 창이 뜨지 않도록).
-    static bool sendToRunningInstance(const QString &command);
+    // 실행 중인 인스턴스를 찾았으면 true. true면 호출자는 즉시 종료해야 한다
+    // (두 번째 창이 뜨지 않도록). command가 비어있지 않으면 명령 파일로 전달한다.
+    //
+    // 소켓은 "생존 감지"에만 쓰고 명령은 파일로 넘긴다. 승격(High IL) 인스턴스가 만든
+    // named pipe는 High 무결성 레이블을 갖고, MIC 기본 정책 NO_WRITE_UP 때문에
+    // 비승격(Medium) 클라이언트는 write 접근이 거부된다.
+    // 실측(Qt 6.10.1, QLocalSocket): Low→Medium connect = SocketAccessError(err=3),
+    // Medium→Medium = 성공. 즉 승격 인스턴스에 소켓으로 명령을 보낼 수 없다.
+    // 다만 실패 코드가 ServerNotFoundError와 다르므로 "살아있다"는 사실은 알 수 있다.
+    static bool deliverCommand(const QString &command);
 
     bool listen();
+
+    // 명령 파일 경로(exe 옆). 승격 인스턴스가 폴링해서 소비하고 지운다.
+    static QString commandFilePath();
 
 signals:
     void commandReceived(const QString &command);
 
 private slots:
     void handleNewConnection();
+    void pollCommandFile();
 
 private:
     QLocalServer server_;
+    QTimer poll_timer_;
 };

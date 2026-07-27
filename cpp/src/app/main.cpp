@@ -115,21 +115,24 @@ void loadFonts() {
 }
 
 int main(int argc, char *argv[]) {
-#ifdef _WIN32
-    // 호출 순서가 중요하다: ensureElevated() → IPC 체크 → QApplication 생성.
-    // 비권한 트램폴린이 서버를 먼저 잡으면 승격본이 2번째 인스턴스로 오인되어 죽는다.
-    if (!ensureElevated()) {
-        return 0;
-    }
-#endif
-
     // ContextHub 트레이/퀵런처가 넘기는 인수. 판단은 전부 argv로 한다.
     const HubArgs hub_args = InstanceIpc::parseArgs(argc, argv);
 
     // 이미 실행 중이면 명령만 넘기고 즉시 종료 — 두 번째 창이 뜨지 않도록.
-    if (InstanceIpc::sendToRunningInstance(hub_args.command)) {
+    // 이 검사는 반드시 ensureElevated()보다 먼저 와야 한다. 그러지 않으면
+    // 트레이/퀵런처 명령마다 UAC 프롬프트가 뜬다(명령만 전달할 프로세스도 승격되므로).
+    if (InstanceIpc::deliverCommand(hub_args.command)) {
         return 0;
     }
+
+#ifdef _WIN32
+    // 순서 제약은 listen()에 대한 것이지 감지(connect)에 대한 것이 아니다.
+    // 비권한 트램폴린이 IPC 서버를 먼저 잡으면 승격본이 2번째 인스턴스로 오인되어 죽으므로
+    // listen()은 계속 승격 이후(아래)에 둔다.
+    if (!ensureElevated()) {
+        return 0;
+    }
+#endif
 
     QCoreApplication::setOrganizationName("HG");
     QCoreApplication::setApplicationName("MonitorWidgetCpp");
