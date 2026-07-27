@@ -65,6 +65,10 @@ private:
     void ensureWindowBounds();
     void setAlwaysOnTop(bool enable);
     void updateOpacity(int value);
+    // 창 위치·불투명도 영속화. 저장은 aboutToQuit(닫기 버튼이 qApp->quit()에 직결),
+    // 복원은 생성자에서 표시 전에 한다.
+    void saveWindowState();
+    void restoreWindowState();
     void updateDashboardTime();
     void setCompactMode(bool enable);
     void toggleCompactMode();
@@ -103,7 +107,6 @@ private:
     bool dragging_ = false;
     bool moved_during_drag_ = false;
     QPoint drag_offset_;
-    bool first_show_ = true;
     QTimer *clock_timer_ = nullptr;
     QTimer *compact_timer_ = nullptr;
     class StatusWriter *status_writer_ = nullptr;

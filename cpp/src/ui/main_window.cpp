@@ -18,6 +18,7 @@
 #include <QResizeEvent>
 #include <QScreen>
 #include <QScrollArea>
+#include <QSettings>
 #include <QShowEvent>
 #include <QSlider>
 #include <QStackedWidget>
@@ -57,6 +58,9 @@ MainWindow::MainWindow(QWidget *parent)
     setFixedSize(kSidebarWidth, kWindowHeight);
 
     buildUi();
+    restoreWindowState();
+    // 닫기 버튼과 --hub quit이 모두 qApp->quit()으로 직행하므로 closeEvent는 안 온다.
+    connect(qApp, &QCoreApplication::aboutToQuit, this, &MainWindow::saveWindowState);
 
     // Init Weather Service
     weather_service_ = new WeatherService(this);
@@ -502,19 +506,13 @@ void MainWindow::ensureWindowBounds() {
         }
     }
 
+    // 첫 표시라고 primary만 따지면 안 된다. 보조 모니터에 복원된 창이 매번 primary로
+    // 끌려온다. 판정 기준은 항상 "어느 화면에도 안 걸침"이다.
     QScreen *primary = QGuiApplication::primaryScreen();
-    if (primary) {
+    if (primary && !on_any_screen) {
         const QRect primary_area = primary->availableGeometry();
-        if (first_show_) {
-            first_show_ = false;
-            if (!frame.intersects(primary_area)) {
-                move(primary_area.left() + 20, primary_area.top() + 20);
-                Logger::warn("ui.main", "Window was outside primary display; moved to primary.");
-            }
-        } else if (!on_any_screen) {
-            move(primary_area.left() + 20, primary_area.top() + 20);
-            Logger::warn("ui.main", "Window was off-screen; moved to primary display.");
-        }
+        move(primary_area.left() + 20, primary_area.top() + 20);
+        Logger::warn("ui.main", "Window was off-screen; moved to primary display.");
     }
 
     if (resized) {
@@ -532,6 +530,35 @@ void MainWindow::setAlwaysOnTop(bool enable) {
 void MainWindow::updateOpacity(int value) {
     const double opacity = static_cast<double>(value) / 100.0;
     setWindowOpacity(opacity);
+}
+
+// QSettings 스코프는 기존 관례(LocationManager)와 같은 organization "MonitorWidget"을 쓴다.
+//
+// 크기는 저장하지 않는다. 창 크기는 expanded_/compact_ 상태에서 setFixedSize로 결정되고
+// ensureWindowBounds()가 매 표시마다 다시 강제하므로 저장해봐야 죽은 값이다.
+// saveGeometry()/restoreGeometry()도 쓰지 않는다. 프레임리스 창에서 실측하니 복원할 때마다
+// y가 26px(타이틀바 두께)씩 밀려 재시작을 반복하면 창이 화면 아래로 기어 내려갔다.
+void MainWindow::saveWindowState() {
+    QSettings settings("MonitorWidget", "Window");
+    settings.setValue("window/pos", pos());
+    if (opacity_slider_) {
+        settings.setValue("window/opacity", opacity_slider_->value());
+    }
+}
+
+void MainWindow::restoreWindowState() {
+    QSettings settings("MonitorWidget", "Window");
+    // 저장값이 없으면 아무것도 건드리지 않는다 — 최초 실행은 기존 기본 동작 그대로.
+    // 화면 밖 보정은 showEvent의 ensureWindowBounds()가 맡는다(모니터 분리 대비).
+    if (settings.contains("window/pos")) {
+        move(settings.value("window/pos").toPoint());
+    }
+    if (opacity_slider_ && settings.contains("window/opacity")) {
+        // setValue → valueChanged → updateOpacity. 범위 밖 값은 슬라이더가 클램프한다.
+        opacity_slider_->setValue(settings.value("window/opacity").toInt());
+    }
+    Logger::info("ui.main", QString("Restored pos=%1,%2 opacity=%3.")
+        .arg(x()).arg(y()).arg(opacity_slider_ ? opacity_slider_->value() : -1));
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
