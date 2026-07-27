@@ -67,8 +67,11 @@ for %%D in (opengl32sw.dll dxcompiler.dll D3Dcompiler_47.dll dxil.dll) do (
 )
 
 echo Copying sensor_host publish output ...
+REM MonoPosixHelper.dll / libMonoPosixHelper.dll(합계 1.5MB)은 제외한다.
+REM LibreHardwareMonitorLib가 끌고 오는 Unix 전용 P/Invoke 헬퍼라 Windows에서는
+REM 로드되지 않는다. 두 DLL 없이 기동하는 것을 실제 실행으로 확인했다.
 mkdir "%DEST%\sensor_host"
-robocopy "%SRC_SENSOR%" "%DEST%\sensor_host" sensor_host.exe MonoPosixHelper.dll libMonoPosixHelper.dll /R:2 /W:2 /NFL /NDL /NJH /NP
+robocopy "%SRC_SENSOR%" "%DEST%\sensor_host" sensor_host.exe /R:2 /W:2 /NFL /NDL /NJH /NP
 if errorlevel 8 (
     echo [ERROR] robocopy failed copying sensor_host files, exit code %errorlevel%
     exit /b 1
