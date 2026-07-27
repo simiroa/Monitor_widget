@@ -6,11 +6,96 @@
 #include <QObject>
 #include <QVector>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
+#include <string>
+
 #include "models/process_info.h"
 #include "models/speed_test_result.h"
 #include "models/system_stats.h"
 #include "ui/main_window.h"
 #include "utils/logger.h"
+#include "utils/win_utils.h"
+
+#ifdef _WIN32
+namespace {
+std::wstring quoteArg(const std::wstring &arg) {
+    if (arg.empty()) {
+        return L"\"\"";
+    }
+    if (arg.find_first_of(L" \t\"") == std::wstring::npos) {
+        return arg;
+    }
+
+    std::wstring out = L"\"";
+    size_t backslashes = 0;
+    for (wchar_t ch : arg) {
+        if (ch == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        if (ch == L'"') {
+            out.append(backslashes * 2 + 1, L'\\');
+            out.push_back(L'"');
+            backslashes = 0;
+            continue;
+        }
+        if (backslashes) {
+            out.append(backslashes, L'\\');
+            backslashes = 0;
+        }
+        out.push_back(ch);
+    }
+    if (backslashes) {
+        out.append(backslashes * 2, L'\\');
+    }
+    out.push_back(L'"');
+    return out;
+}
+
+bool relaunchElevated() {
+    wchar_t exe_path[MAX_PATH];
+    const DWORD len = GetModuleFileNameW(nullptr, exe_path, MAX_PATH);
+    if (len == 0 || len >= MAX_PATH) {
+        return false;
+    }
+
+    int argc = 0;
+    LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    std::wstring params;
+    if (argv) {
+        for (int i = 1; i < argc; ++i) {
+            if (!params.empty()) {
+                params.push_back(L' ');
+            }
+            params += quoteArg(argv[i]);
+        }
+        LocalFree(argv);
+    }
+
+    HINSTANCE result = ShellExecuteW(nullptr, L"runas", exe_path,
+        params.empty() ? nullptr : params.c_str(), nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<intptr_t>(result) > 32;
+}
+
+bool ensureElevated() {
+    if (WinUtils::isElevated()) {
+        return true;
+    }
+    const bool launched = relaunchElevated();
+    if (!launched) {
+        MessageBoxW(nullptr,
+            L"Administrator privileges are required to run Monitor Widget.",
+            L"Monitor Widget",
+            MB_OK | MB_ICONERROR);
+    }
+    return false;
+}
+}  // namespace
+#endif
 
 namespace {
 void loadFonts() {
@@ -29,6 +114,12 @@ void loadFonts() {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef _WIN32
+    if (!ensureElevated()) {
+        return 0;
+    }
+#endif
+
     QCoreApplication::setOrganizationName("HG");
     QCoreApplication::setApplicationName("MonitorWidgetCpp");
 
