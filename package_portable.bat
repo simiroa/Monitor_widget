@@ -46,7 +46,7 @@ mkdir "%DEST%"
 echo Copying app runtime files from cpp\build_new ...
 robocopy "%SRC_APP%" "%DEST%" /E ^
     /XD "CMakeFiles" "monitor_widget_autogen" ".qt" "logs" "translations" "VirtualDisplayDriver" ^
-    /XF "*.txt" "Makefile" "CMakeCache.txt" "cmake_install.cmake" "*.cmake" "*.pdb" "*.ilk" "*.obj" ^
+    /XF "*.txt" "Makefile" "CMakeCache.txt" "cmake_install.cmake" "*.cmake" "*.pdb" "*.ilk" "*.obj" "status.json" ^
     /R:2 /W:2 /NFL /NDL /NJH /NP
 if errorlevel 8 (
     echo [ERROR] robocopy failed copying app files, exit code %errorlevel%
