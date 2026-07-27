@@ -40,7 +40,10 @@ public:
 
     bool listen();
 
-    // 명령 파일 경로(exe 옆). 승격 인스턴스가 폴링해서 소비하고 지운다.
+    // 명령 파일 경로. 승격 인스턴스가 폴링해서 소비하고 지운다.
+    // exe 폴더가 아니라 CTX_APP_DATA_DIR(없으면 %LOCALAPPDATA%\Contexthub\monitor_widget)
+    // 아래이며 파일명에 세션 키가 들어간다 — serverName()과 스코프를 맞추기 위해서다.
+    // exe 옆에 두면 사본이 두 폴더에 있을 때 명령이 실행 중인 인스턴스에 도달하지 못한다.
     static QString commandFilePath();
 
 signals:

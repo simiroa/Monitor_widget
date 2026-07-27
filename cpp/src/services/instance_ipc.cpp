@@ -1,8 +1,10 @@
 #include "services/instance_ipc.h"
 
-#include <QCoreApplication>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QLocalSocket>
+#include <QStandardPaths>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -15,27 +17,46 @@ constexpr int kConnectTimeoutMs = 500;
 // 트레이 클릭 반응 지연의 상한. 파일 1개 stat이라 비용은 무시할 수준이다.
 constexpr int kPollIntervalMs = 500;
 
-// exe가 있는 폴더. QCoreApplication 생성 전에도 불려야 하므로
-// applicationDirPath()를 쓸 수 없다(명령 프로세스는 QApplication을 만들지 않는다).
-QString exeDir() {
-#ifdef _WIN32
-    wchar_t buf[MAX_PATH];
-    const DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-    if (len == 0 || len >= MAX_PATH) {
-        return QString();
+// 명령 파일이 사는 폴더. exe 옆이 아니라 사용자별 고정 경로다.
+// 이유 두 가지:
+//   1) 스코프 일치. serverName()은 세션 단위(폴더 무관)라 위젯 사본이 두 폴더에 있으면
+//      B 폴더 exe가 A 폴더 인스턴스를 "살아있다"고 감지한 뒤 명령은 B 폴더에 써서
+//      영영 도달하지 않았다. 서버 이름과 같은 스코프로 옮겨야 만난다.
+//   2) 쓰기 권한. 명령을 쓰는 쪽은 비승격 프로세스라 exe 폴더가 Program Files면 실패한다.
+//      (HUB_CONTRACT.md §3-7: 앱은 CTX_APP_DATA_DIR 밖에 쓰지 않는다.)
+// CTX_APP_DATA_DIR은 아직 허브가 주입하지 않는("planned") 값이라 폴백이 필수다.
+// 폴백에 %LOCALAPPDATA%를 직접 쓰는 이유: AppDataLocation은
+// QCoreApplication::setApplicationName() 이후에만 올바른 값을 주는데, deliverCommand()는
+// 그 호출보다 먼저 돌아 두 프로세스가 서로 다른 경로를 보게 된다.
+QString commandDir() {
+    const QString injected = qEnvironmentVariable("CTX_APP_DATA_DIR");
+    if (!injected.isEmpty()) {
+        return injected;
     }
-    const QString path = QString::fromWCharArray(buf, static_cast<int>(len));
-    const int slash = path.lastIndexOf(QLatin1Char('\\'));
-    return slash > 0 ? path.left(slash) : QString();
-#else
-    return QCoreApplication::applicationDirPath();
+    QString base = qEnvironmentVariable("LOCALAPPDATA");
+    if (base.isEmpty()) {
+        base = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation);
+    }
+    return base.isEmpty() ? QString() : base + QLatin1String("/Contexthub/monitor_widget");
+}
+
+// serverName()과 commandFilePath()가 공유하는 스코프 키. 둘이 어긋나면 버그가 되돌아온다.
+QString sessionKey() {
+#ifdef _WIN32
+    DWORD session_id = 0;
+    if (ProcessIdToSessionId(GetCurrentProcessId(), &session_id)) {
+        return QString::number(session_id);
+    }
 #endif
+    // 세션 ID를 못 얻으면 사용자 이름으로 대체한다. 목적은 사용자 간 충돌 방지다.
+    return qEnvironmentVariable("USERNAME", "default");
 }
 
 // status.json과 같은 원자적 쓰기 패턴(tmp → rename).
 // ponytail: 큐가 아니라 슬롯 1개다. 500ms 안에 명령 2개가 오면 뒤엣것만 남는다.
 // 트레이 클릭 간격이 그보다 짧을 일이 없어 그대로 둔다. 필요해지면 파일명에 순번을 붙인다.
 bool writeCommandFile(const QString &path, const QString &command) {
+    QDir().mkpath(QFileInfo(path).absolutePath());
     const QString tmp_path = path + ".tmp";
     QFile file(tmp_path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -95,19 +116,14 @@ HubArgs InstanceIpc::parseArgs(int argc, char *argv[]) {
 }
 
 QString InstanceIpc::serverName() {
-#ifdef _WIN32
-    DWORD session_id = 0;
-    if (ProcessIdToSessionId(GetCurrentProcessId(), &session_id)) {
-        return QString("monitor_widget_ipc_%1").arg(session_id);
-    }
-#endif
-    // 세션 ID를 못 얻으면 사용자 이름으로 대체한다. 목적은 사용자 간 충돌 방지다.
-    return QString("monitor_widget_ipc_%1").arg(qEnvironmentVariable("USERNAME", "default"));
+    return QString("monitor_widget_ipc_%1").arg(sessionKey());
 }
 
 QString InstanceIpc::commandFilePath() {
-    const QString dir = exeDir();
-    return dir.isEmpty() ? QString() : dir + QLatin1String("/command.txt");
+    const QString dir = commandDir();
+    // 파일명의 세션 키가 serverName()의 스코프와 짝을 이룬다.
+    return dir.isEmpty() ? QString()
+                         : dir + QLatin1String("/command_") + sessionKey() + QLatin1String(".txt");
 }
 
 bool InstanceIpc::deliverCommand(const QString &command) {
