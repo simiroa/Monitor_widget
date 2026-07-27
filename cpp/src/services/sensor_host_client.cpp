@@ -199,7 +199,12 @@ void SensorHostClient::ensureConnected() {
         startProcess(path);
     }
 
-    socket_.connectToServer(pipe_name_);
+    // ReadOnly로 열어야 한다. sensor_host는 NamedPipeServerStream(..., PipeDirection.Out, 1)로
+    // PIPE_ACCESS_OUTBOUND 파이프를 만들기 때문에 클라이언트는 읽기 전용으로만 열 수 있다.
+    // connectToServer()의 기본값 ReadWrite는 GENERIC_WRITE까지 요구해서 CreateFile이
+    // ERROR_ACCESS_DENIED(5)로 실패하고, QLocalSocket::SocketAccessError(=3)로 나타난다.
+    // 이 클라이언트는 readAll()만 하므로 ReadOnly가 실제 사용과도 일치한다.
+    socket_.connectToServer(pipe_name_, QIODevice::ReadOnly);
 }
 
 QString SensorHostClient::resolveHostPath() const {
